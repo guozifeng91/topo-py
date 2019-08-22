@@ -6,6 +6,9 @@ from multiprocessing import Process
 import random
 import time
 
+'''
+three test case
+'''
 def test_tree(ke):
     top = Topology(ke)
     top.set_domain(128,128)

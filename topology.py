@@ -19,7 +19,7 @@ class Topology():
     top = Topology(ke)
     top.set_domain()
     
-    2. setting boundary conditions (these can be in either sequence)
+    2. setting boundary conditions (in any sequence)
     top.set_load_dof_range()
     top.set_fix_dof_range()
     top.set_actv_pasv_elements_range()
@@ -670,7 +670,7 @@ class Topology():
 
     def update_design_var_SIMP(self, volfrac, move=0.1, lam1=0, lam2=1e6, eta = 0.5):
         '''
-        OK-like method for updating design variables
+        OC-like method for updating design variables
         
         code reference:
         https://github.com/vonlippmann/Topology-optimization-of-structure-via-simp-method/blob/Topology_optimization_simp/Python/optimization_simp.py
@@ -751,7 +751,7 @@ class Topology():
         change_stop: optimization stops if the change between 2 iterations less than this value
         filter_radius: filter radius
         sparse: use sparse matrix implementation, note that sparse implementation is optimized and therefore faster than dense version, the dense version should only be use to validate the result
-        visualize: save the figure for visualization
+        visualizer: list of visualizer
         
         move: the "learning rate" of the gradient-based process
         '''
@@ -791,7 +791,9 @@ class Topology():
         '''
         this implementation follows the BESO of EVOLUTIONARY TOPOLOGY OPTIMIZATION OF CONTINUUM STRUCTURES by Huang and Xie
         
-        currently the implementation is not fully functional
+        currently the implementation is not fully functional (works for the cantilever and beam cases, when there are just few nodes that have load)
+        
+        i think i didn't understand the methodology correctly somewhere
         
         parameters
         -------------
@@ -802,7 +804,7 @@ class Topology():
         max_addition_raio: maximum ratio of adding elements per iteration
         filter_radius: filter radius
         sparse: use sparse matrix implementation, note that sparse implementation is optimized and therefore faster than dense version, the dense version should only be use to validate the result
-        visualize: save the figure for visualization
+        visualizer: list of visualizer
         '''
         self.reset_design_var_BESO()
         N = 5
