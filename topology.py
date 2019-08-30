@@ -2,7 +2,7 @@ import numpy as np
 import element as ele
 
 from scipy.sparse import csr_matrix, csc_matrix
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve, cg, splu, spilu, LinearOperator, gmres
 
 # solid and void status (design variable) of elements
 SOLID=1.0
@@ -159,7 +159,7 @@ class Topology():
         x_load_list=[]
         y_load_list=[]
         z_load_list=[]
-        
+
         if self.dof==2:
             for node,load in zip(x_node,x_load):
                 min_u,max_u,min_v,max_v = node
@@ -183,7 +183,7 @@ class Topology():
                 
             for node,load in zip(z_node,z_load):
                 min_u,max_u,min_v,max_v,min_w,max_w = node
-                z_node_list = z_node_list + [self.get_node_index(u,v, w) for w in range(min_w,max_w) for v in range(min_v,max_v) for u in range(min_u, max_u)]
+                z_node_list = z_node_list + [self.get_node_index(u,v,w) for w in range(min_w,max_w) for v in range(min_v,max_v) for u in range(min_u, max_u)]
                 z_load_list = z_load_list + ([load] * (max_u - min_u) * (max_v - min_v) * (max_w - min_w))
 
         self.set_load_dof(x_node_list,y_node_list,z_node_list,x_load_list,y_load_list,z_load_list)
@@ -197,8 +197,8 @@ class Topology():
         self.load_vector[np.array(x_node,dtype=np.int32)*self.dof] = np.array(x_load,dtype=np.float64)
         self.load_vector[np.array(y_node,dtype=np.int32)*self.dof+1] = np.array(y_load,dtype=np.float64)
         if self.dof==3:
-            self.load_vector[np.array(z_node,dtype=np.int32)*self.dof] = np.array(z_load,dtype=np.float64)
-    
+            self.load_vector[np.array(z_node,dtype=np.int32)*self.dof+2] = np.array(z_load,dtype=np.float64)
+        
     def set_actv_pasv_elements_range(self, actv_elements, pasv_elements):
         '''
         set active and passive element by giving [[min_u,max_u,min_v,max_v,min_w,max_w],[min_u,max_u,min_v,max_v,min_w,max_w],...]
@@ -384,9 +384,18 @@ class Topology():
         K_reduction = self.K_sparse_reduction
         load_reduction = self.load_vector[self.free_dof]
 
-        # solve the linear system (this take the most time of fea, permc_spec='NATURAL' seems faster, 50% than default setting)
-        disp_reduction = spsolve(K_reduction, load_reduction, use_umfpack=True, permc_spec='NATURAL') # Force = K * Disp
-
+        if self.dof==2:
+            # solve the linear system (this take the most time of fea, permc_spec='NATURAL' seems faster, 50% than default setting)
+            disp_reduction = spsolve(K_reduction, load_reduction, use_umfpack=True, permc_spec='NATURAL') # Force = K * Disp
+        else:
+            M = spilu(K_reduction.tocsc())
+            M= LinearOperator(M.shape,M.solve)
+            
+            disp_reduction, info = gmres(K_reduction, load_reduction, M=M, maxiter = 8000)
+            
+            if info != 0:
+                raise Exception("FEA not converged")
+                
         # retrieve the result
         self.disp_vector = np.zeros(self.matrix_size,dtype=np.float64)
         self.disp_vector[self.free_dof] = disp_reduction
@@ -756,6 +765,7 @@ class Topology():
         move: the "learning rate" of the gradient-based process
         '''
         self.reset_design_var_SIMP()
+        self.target_volume_ratio = volfrac
         
         print ("FEA matrix size",len(self.free_dof))
         print ("{:<5} {:<10} {:<10}".format('iter','v_ratio','change'))
@@ -807,6 +817,7 @@ class Topology():
         visualizer: list of visualizer
         '''
         self.reset_design_var_BESO()
+        self.target_volume_ratio = target_volume_ratio
         N = 5
         C = []
         print ("FEA matrix size",len(self.free_dof))
